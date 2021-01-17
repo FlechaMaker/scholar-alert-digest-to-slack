@@ -1,0 +1,12 @@
+{
+  "name": "scholar-alert-digest-to-slack",
+  "version": "1.0.0",
+  "description": "Post google scholar alert digest (https://github.com/bzz/scholar-alert-digest) to slack",
+  "main": "main.js",
+  "repository": "https://github.com/FlechaMaker/scholar-alert-digest-to-slack",
+  "author": "FlechaMaker",
+  "license": "Apache-2.0 License",
+  "dependencies": {
+    "@slack/web-api": "^6.0.0"
+  }
+}
