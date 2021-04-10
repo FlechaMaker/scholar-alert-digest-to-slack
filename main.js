@@ -1,5 +1,6 @@
 const { WebClient } = require('@slack/web-api');
 const { execSync } = require('child_process');
+const { title } = require('process');
 
 const sleep = msec => new Promise(resolve => setTimeout(resolve, msec));
 
@@ -15,6 +16,7 @@ const conversationId = process.env.SAD_SLACK_CONVERSATION_ID;
 (async () => {
   const papers = await execSync('scholar-alert-digest -l "google-scholar" -json -authors -refs -mark');
 
+  let contents = [];
   let attachments = [];
   papers.toString('utf-8').split(/[\n\r]/).forEach(paper => {
     try {
@@ -30,32 +32,52 @@ const conversationId = process.env.SAD_SLACK_CONVERSATION_ID;
       paper["Title"] = paper["Title"].slice(0, 147) + "...";
     }
 
-    let content = {
-      "blocks": [
-        {
-          "type": "header",
-          "text": {
+    let content = [
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": paper["Title"],
+          "emoji": true
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": paper["Author"]
+        }
+      },
+      {
+        "type": "context",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": `:link: ${paper["URL"]}`
+          }
+        ]
+      },
+      {
+        "type": "context",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": `Count: ${paper["Freq"]}`
+          },
+          {
             "type": "plain_text",
-            "text": paper["Title"],
+            "text": `Source: ${paper["Refs"].map( e => e["Title"] ).join(', ')}`,
             "emoji": true
           }
-        },
-        {
-          "type": "section",
-          "text": {
-            "type": "mrkdwn",
-            "text": paper["Author"]
-          }
-        },
-        {
-          "type": "context",
-          "elements": [
-            {
-              "type": "mrkdwn",
-              "text": `:link: ${paper["URL"]}`
-            }
-          ]
-        },
+        ]
+      },
+      {
+        "type": "divider"
+      }
+    ]
+
+    let attachment = {
+      "blocks": [
         {
           "type": "section",
           "text": {
@@ -63,24 +85,11 @@ const conversationId = process.env.SAD_SLACK_CONVERSATION_ID;
             "text": paper["Abstract"]["FirstLine"] + " " + paper["Abstract"]["Rest"]
           }
         },
-        {
-          "type": "context",
-          "elements": [
-            {
-              "type": "mrkdwn",
-              "text": `Count: ${paper["Freq"]}`
-            },
-            {
-              "type": "plain_text",
-              "text": `Source: ${paper["Refs"].map( e => e["Title"] ).join(', ')}`,
-              "emoji": true
-            }
-          ]
-        },
       ]
     };
 
-    attachments.push(content);
+    contents.push(content);
+    attachments.push(attachment);
   });
   // there is no paper
   if (attachments.length <= 0) {
@@ -109,20 +118,22 @@ const conversationId = process.env.SAD_SLACK_CONVERSATION_ID;
     },
   ];
 
-  let res = await web.chat.postMessage({
+  let title_message = await web.chat.postMessage({
     channel: conversationId,
     blocks: alertInfo,
   });
-  console.log('Message sent: ', res.ts);
+  console.log('Message sent: ', title_message.ts);
 
   for (let i = 0; i < attachments.length; i++) {
-    res = await web.chat.postMessage({
+    let paper_message = await web.chat.postMessage({
       channel: conversationId,
+      thread_ts: title_message.ts,
+      blocks: contents[i],
       attachments: [attachments[i]],
     });
     
-    console.log('Message sent: ', res.ts);
+    console.log('Message sent: ', paper_message.ts);
     await sleep(700);
-    if (!res.ok) break;
+    if (!paper_message.ok) break;
   }
 })();
